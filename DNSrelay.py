@@ -8,7 +8,7 @@ if __name__ == "__main__":
     #print(args)
     startInfo = Handle_para(args, default_settings)
     #print(startInfo)
-    debuger = set_debuger(startInfo['mode'])
-    debuger.info("啦啦啦啦啦啦")
-    debuger.debug("hahahahahaah")
+    debugger = set_debuger(startInfo['mode'])
+    debugger.info("啦啦啦啦啦啦")
+    debugger.debug("hahahahahaah")
     

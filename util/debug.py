@@ -1,5 +1,8 @@
 import logging
-
+"""
+    详细信息使用info
+    简略信息使用debug
+"""
 def set_debuger(level):
     _log_level = [logging.WARNING,logging.INFO,logging.DEBUG]
     LOG_FORMAT = "%(asctime)s %(levelname)s\t%(threadName)s %(message)s "#配置输出日志格式

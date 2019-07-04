@@ -1,8 +1,12 @@
 """
-    从接收到的数据解包
+    根据收到的请求组包，分为三个类型：
+        type == 0 ：正向查询，查询ip为0.0.0.0，返回错误信息
+        type == 1 ：正向查询，合法ip，返回本地数据或远程数据
+        type == 2 ：反向查询，查询ip，返回本地或远程数据
 """
 import struct
-class Message:
+from serve.message import Message
+class Response:
     """
     ┏━━━━━━━━━━
     ┃      Header       ┃  6部分，共12字节
@@ -16,42 +20,12 @@ class Message:
     ┃     Additional    ┃  附加区域
     ┃━━━━━━━━━ ┃
     """
-    def __init__(self, data):
-        self.header = Header(data[0:12])
-        self.questions = []
-        self.answers = []
-        self.authorities = []
-        self.additionals = []
-        index = 12
-        if self.header.QDCOUNT != 0 :
-            index = self._handle_question(data, index)
-        if self.header.ANCOUNT != 0 :
-            index = self._handle_resource(data, index, self.answers, self.header.ANCOUNT)
-        if self.header.NSCOUNT != 0 :
-            index = self._handle_resource(data, index, self.authorities, self.header.NSCOUNT)
-        if self.header.ARCOUNT != 0 :
-            index = self._handle_resource(data, index, self.additionals, self.header.ARCOUNT)
-
-
-
-    def _handle_question(self, data, index):
-        for i in range(self.header.QDCOUNT):
-            next_index = index + data[index:].find(0) + 5
-            self.questions.append(Question(data[index:next_index]))
-            index = next_index
-        return index
-    @staticmethod
-    def _handle_resource(data, index, rlist, count):
-        next_index = index
-        for i in range(count):
-            if data[next_index] >> 6 == 3:
-                start = next_index + 2
-            else:
-                start = next_index + data[next_index:].find(0) + 1
-            Rtype, Rclass, Rttl, Rdlengh = struct.unpack('>HHIH',data[start:start+10])
-            rlist.append(Resource(data[next_index:start], Rtype, Rclass, Rttl, Rdlengh, data[start+10:start+10+Rdlengh]))
-            next_index = start + 10 + Rdlengh
-        return next_index
+    #TO DO
+    def __init__(self, type, request):
+        self.type = type
+    def get_response(self):
+        self.type = 0
+        return b'\x00'
 
 class Header:
     """
@@ -110,8 +84,7 @@ class Question:
         elif self.QTYPE == 2:
             self.ip = self.QNAME
 
-    @staticmethod
-    def _get_webname(data):
+    def _get_webname(self,data):
         i = 1
         webname = ''
         while True:
@@ -123,6 +96,7 @@ class Question:
             else:
                 webname = webname + chr(char)
             i = i + 1
+
         return webname
 
 

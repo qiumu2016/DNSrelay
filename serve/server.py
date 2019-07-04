@@ -1,14 +1,51 @@
 import socketserver
 from util.debug import set_debuger
 from serve.message import Message
-from serve.message import Header
-from serve.message import Question
-from serve.message import Resource
+from serve.response import Response
 
 class DNS_handler(socketserver.BaseRequestHandler):
     def handle(self):
         data, sock = self.request
         DNSrequest = Message(data)
+        hostRecord = DNSServer.hosts
+        #一条正向查询请求
+        if DNSrequest.header.QR == 0 and DNSrequest.header.Opcode == 0:
+            #处理questions
+            #检查请求的域名合法性
+            Rtype = self._chech_request(DNSrequest, hostRecord)
+            #构造返回包
+            # TO DO
+            response = Response(Rtype, DNSrequest).get_response()
+            # 发送返回信息
+            sock.sendto(response, self.client_address)
+        #一条反向查询请求
+        elif DNSrequest.header.QR == 0 and DNSrequest.header.Opcode == 1:
+            Rtype = 2
+            # 构造返回包
+            # TO DO
+            response = Response(Rtype, DNSrequest).get_response()
+            # 发送返回信息
+            sock.sendto(response, self.client_address)
+        #非查询请求，返回错误信息
+        else:
+            Rtype = 0
+            # 构造返回包
+            # TO DO
+            response = Response(Rtype, DNSrequest).get_response()
+            #发送返回信息
+            sock.sendto(response, self.client_address)
+
+    @staticmethod
+    def _chech_request(self, request, host):
+        _type = 1
+        for i in range(request.header.QDCOUNT):
+            requestDomain = request.questions[i].webname
+            if requestDomain in host:
+                if host[requestDomain] == '0.0.0.0':
+                    _type = 0
+                    return _type
+        return _type
+
         #print('DNSrequest:', DNSrequest.header)
         #print('details:', DNSrequest.questions[0])
         #print('items:', ', '.join(['%s:%s' % item for item in DNSrequest.header.__dict__.items()]))

@@ -7,6 +7,6 @@ def gethost(fileName):
     for content in contents:
         record = content.split(' ')
         ip = record[0]
-        domain = record[1]
+        domain = record[1].lower()
         result.update({domain: ip})
     return result

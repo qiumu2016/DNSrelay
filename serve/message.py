@@ -13,7 +13,41 @@ class Message:
     ┃     Additional    ┃  附加区域
     ┃━━━━━━━━━ ┃
     """
-    def __init__(self):
+    def __init__(self, data):
+        self.header = Header(data[0:12])
+        self.questions = []
+        self.answers = []
+        self.authorities = []
+        self.additionals = []
+        index = 12
+        if self.header.QDCOUNT != 0 :
+            index = self._handle_question(data, index)
+        if self.header.ANCOUNT != 0 :
+            index = self._handle_resource(data, index, self.answers, self.header.ANCOUNT)
+        if self.header.NSCOUNT != 0 :
+            index = self._handle_resource(data, index, self.authorities, self.header.NSCOUNT)
+        if self.header.ARCOUNT != 0 :
+            index = self._handle_resource(data, index, self.additionals, self.header.ARCOUNT)
+
+
+
+    def _handle_question(self, data, index):
+        for i in range(self.header.QDCOUNT):
+            next_index = index + data[index:].find(0) + 5
+            self.questions.append(Question(data[index:next_index]))
+            index = next_index
+        return index
+    def _handle_resource(self, data, index, rlist, count):
+        next_index = index
+        for i in range(count):
+            if data[next_index] >> 6 == 3:
+                start = next_index + 2
+            else:
+                start = next_index + data[next_index:].find(0) + 1
+            Rtype, Rclass, Rttl, Rdlengh = struct.unpack('>HHIH',data[start:start+10])
+            rlist.append(Resource(data[next_index:start], Rtype, Rclass, Rttl, Rdlengh, data[start+10:start+10+Rdlengh]))
+            next_index = start + 10 + Rdlengh
+        return next_index
 
 class Header:
     """
@@ -41,8 +75,16 @@ class Header:
     Z（3bit）   未使用，必须置0
     rcode（4bit）	表示返回码，0表示没有差错，3表示名字差错，2表示服务器错误（Server Failure）
     """
-    def __init__(self):
-
+    def __init__(self,data):
+        self.ID, self.FLAGS, self.QDCOUNT, self.ANCOUNT, self.NSCOUNT, self.ARCOUNT = struct.unpack('>HHHHHH',data)
+        self.QR = bytes([(self.FLAGS >>15)])
+        self.Opcode = bytes([(self.FLAGS << 1 >> 12)])
+        self.AA = bytes([(self.FLAGS << 5 >> 15)])
+        self.TC = bytes([(self.FLAGS << 6 >> 15)])
+        self.RD = bytes([(self.FLAGS << 7 >> 15)])
+        self.RA = bytes([(self.FLAGS >> 7 & 0x01)])
+        self.Z = bytes([(self.FLAGS >> 4 & 0x07)])
+        self.RCODE = bytes([(self.FLAGS & 0x0f)])
 class Question:
     """
     0  1  2  3  4  5  9  7  8  9  0  1  2  3  4  5
@@ -56,7 +98,29 @@ class Question:
     |                     QCLASS                    |   2字节，查询类：通常为1，表示IN，表明是Internet数据。
     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     """
-    def __init__(self):
+    def __init__(self, data):
+        self.QTYPE, self.QCLASS = struct.unpack('>HH',data[-4:])
+        self.QNAME = data[:-4]
+        if self.QTYPE == 1 :
+            self.webname = self._get_webname(self.QNAME)
+        elif self.QTYPE == 2:
+            self.ip = self.QNAME
+
+    def _get_webname(self,data):
+        i = 1
+        webname = ''
+        while True:
+            char = data[i]
+            if char == 0:
+                break
+            if char < 32:
+                webname = webname + '.'
+            else:
+                webname = webname + chr(char)
+            i = i + 1
+
+        return webname
+
 
 class Resource:
     """
@@ -81,4 +145,13 @@ class Resource:
      /                                              /
     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     """
-    def __init__(self):
+    def __init__(self, rname, rtype, rclass,rttl, rdlength, rdata ):
+        self.NAME = rname
+        self.TYPE = rtype
+        self.CLASS = rclass
+        self.TTL = rttl
+        self.RDLENGTH = rdlength
+        self.RDATA = rdata
+
+
+

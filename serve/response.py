@@ -21,11 +21,56 @@ class Response:
     ┃━━━━━━━━━ ┃
     """
     #TO DO
-    def __init__(self, type, request):
-        self.type = type
+    def __init__(self, rtype, request, hostRecord):
+        self.host = hostRecord
+        self.rtype = rtype
+        self.questions = []
+        self.answers = []
+        self.authorities = []
+        self.additionals = []
+        if rtype == 0:
+            _id = request.header.ID
+            _flags = 32773
+            self.header = Header(_id, _flags, 0, 0, 0, 0)
+            for i in request.header.QDCOUNT:
+                self.questions.append(Question(request.questions[i].QNAME, request.questions[i].CLASS, request.questions[i].QTYPE))
+        elif rtype == 1:
+            _id = request.header.ID
+            _flags = 32768
+            self.header = Header(_id, _flags, request.header.QDCOUNT, request.header.QDCOUNT, 0, 0)
+            for i in request.header.QDCOUNT:
+                self.questions.append(Question(request.questions[i].QNAME, request.questions[i].CLASS, request.questions[i].QTYPE))
+                _ip = self._get_ip(request.questions[i])
+                self.answers.append(Resource(49164, 1, 1, 86400, 4, _ip))
+        #TODO ; 反向查询
+        else:
+            _id = request.header.ID
+            _flags = 32773
+            self.header = Header(_id, _flags, 0, 0, 0, 0)
+            for i in request.header.QDCOUNT:
+                self.questions.append(
+                    Question(request.questions[i].QNAME, request.questions[i].CLASS, request.questions[i].QTYPE))
+
+    #TODO:  远程请求ip信息
+    def _get_ip(self, question):
+        _ip = ''
+        requestDomain = question.webname
+        if requestDomain in self.host:
+            _ip = self.host[requestDomain]
+        else:
+            _ip = '0.0.0.0'
+        return _ip
     def get_response(self):
-        self.type = 0
-        return b'\x00'
+        res = self.header.get_header()
+        if self.rtype == 0:
+            return res
+        else:
+            for i in range(self.header.QDCOUNT):
+                res += self.questions[i].get_question()
+        for i in range(self.header.ANCOUNT):
+            res += self.answers[i].get_resource()
+
+        return res
 
 class Header:
     """
@@ -53,16 +98,17 @@ class Header:
     Z（3bit）   未使用，必须置0
     rcode（4bit）	表示返回码，0表示没有差错，3表示名字差错，2表示服务器错误（Server Failure）
     """
-    def __init__(self,data):
-        self.ID, self.FLAGS, self.QDCOUNT, self.ANCOUNT, self.NSCOUNT, self.ARCOUNT = struct.unpack('>HHHHHH',data)
-        self.QR = self.FLAGS >>15
-        self.Opcode = self.FLAGS << 1 >> 12
-        self.AA = self.FLAGS << 5 >> 15
-        self.TC = self.FLAGS << 6 >> 15
-        self.RD = self.FLAGS << 7 >> 15
-        self.RA = self.FLAGS >> 7 & 0x01
-        self.Z = self.FLAGS >> 4 & 0x07
-        self.RCODE = self.FLAGS & 0x0f
+    def __init__(self, _id, flags, qdcount, ancount, nscount, arount):
+        self.ID = _id
+        self.FLAGS = flags
+        self.QDCOUNT = qdcount
+        self.ANCOUNT = ancount
+        self.NSCOUNT = nscount
+        self.ARCOUNT = arount
+    def get_header(self):
+        res = struct.pack('>HHHHHH', self.ID, self.FLAGS, self.QDCOUNT, self.ANCOUNT, self.NSCOUNT, self.ARCOUNT)
+        return res
+
 class Question:
     """
     0  1  2  3  4  5  9  7  8  9  0  1  2  3  4  5
@@ -76,28 +122,13 @@ class Question:
     |                     QCLASS                    |   2字节，查询类：通常为1，表示IN，表明是Internet数据。
     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     """
-    def __init__(self, data):
-        self.QTYPE, self.QCLASS = struct.unpack('>HH',data[-4:])
-        self.QNAME = data[:-4]
-        if self.QTYPE == 1 :
-            self.webname = self._get_webname(self.QNAME).lower()
-        elif self.QTYPE == 2:
-            self.ip = self.QNAME
+    def __init__(self, _name, _type, _class):
+        self.QTYPE =_type
+        self.QCLASS = _class
+        self.QNAME = _name
 
-    def _get_webname(self,data):
-        i = 1
-        webname = ''
-        while True:
-            char = data[i]
-            if char == 0:
-                break
-            if char < 32:
-                webname = webname + '.'
-            else:
-                webname = webname + chr(char)
-            i = i + 1
-
-        return webname
+    def get_question(self):
+        return self.QNAME + self.QTYPE + self.QCLASS
 
 
 class Resource:
@@ -130,6 +161,12 @@ class Resource:
         self.TTL = rttl
         self.RDLENGTH = rdlength
         self.RDATA = rdata
+
+    def get_resource(self):
+        res = struct.pack('>HHHLH',self.NAME, self.TYPE, self.CLASS, self.TTL, self.RDLENGTH)
+        ip = self.RDATA.split('.')
+        res += struct.pack('BBBB', int(ip[0]), int(ip[1]), int(ip[2]), int(ip[3]))
+        return res
 
 
 

@@ -15,25 +15,24 @@ class DNS_handler(socketserver.BaseRequestHandler):
             Rtype = self._chech_request(DNSrequest, hostRecord)
             #构造返回包
             # TO DO
-            response = Response(Rtype, DNSrequest).get_response()
+            response = Response(Rtype, DNSrequest, hostRecord)
             # 发送返回信息
-            sock.sendto(response, self.client_address)
+            sock.sendto(response.get_response(), self.client_address)
         #一条反向查询请求
         elif DNSrequest.header.QR == 0 and DNSrequest.header.Opcode == 1:
             Rtype = 2
             # 构造返回包
             # TO DO
-            response = Response(Rtype, DNSrequest).get_response()
+            response = Response(Rtype, DNSrequest, hostRecord)
             # 发送返回信息
-            sock.sendto(response, self.client_address)
+            sock.sendto(response.get_response(), self.client_address)
         #非查询请求，返回错误信息
         else:
             Rtype = 0
             # 构造返回包
-            # TO DO
-            response = Response(Rtype, DNSrequest).get_response()
+            response = Response(Rtype, DNSrequest, hostRecord)
             #发送返回信息
-            sock.sendto(response, self.client_address)
+            sock.sendto(response.get_response(), self.client_address)
 
     @staticmethod
     def _chech_request(self, request, host):

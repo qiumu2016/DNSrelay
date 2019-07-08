@@ -105,7 +105,7 @@ class Question:
     def __init__(self, data):
         self.QTYPE, self.QCLASS = struct.unpack('>HH',data[-4:])
         self.QNAME = data[:-4]
-        if self.QTYPE == 1 :
+        if self.QTYPE == 1 or self.QTYPE == 28:
             self.webname = self._get_webname(self.QNAME).lower()
         elif self.QTYPE == 2:
             self.ip = self.QNAME

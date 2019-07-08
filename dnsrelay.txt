@@ -637,7 +637,6 @@
 210.242.125.98 ghs.l.google.com
 210.242.125.98 ghs46.google.com
 210.242.125.98 ghs46.l.google.com
-210.242.125.98 google.com
 210.242.125.98 googlecode.l.google.com
 210.242.125.98 google-public-dns-a.google.com
 210.242.125.98 google-public-dns-b.google.com

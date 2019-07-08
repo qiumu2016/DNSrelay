@@ -35,17 +35,17 @@ def Handle_para(args, default):
         mode = 2
 
     if args.addr is None:
-        print("Use default remote DNS server address : " , default.address)
+        print("Use default remote DNS server address\t:" , default.address)
         addr = default.address
     else:
-        print("Use user's DNS server address : " , args.addr)
+        print("Use user's DNS server address\t\t\t:" , args.addr)
         addr = args.addr
     
     if args.file is None:
-        print("Use default hostfile : " , default.hostfile)
+        print("Use default hostfile\t\t\t:" , default.hostfile)
         hosts = gethost(default.hostfile)
     else:
-        print("Use user's hostfile : " , args.file)
+        print("Use user's hostfile\t\t\t:" , args.file)
         hosts = gethost(args.file)
 
     return dict(mode = mode, hosts = hosts, addr = addr)

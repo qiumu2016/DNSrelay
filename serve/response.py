@@ -1,11 +1,11 @@
 """
-    根据收到的请求组包，分为三个类型：
+    根据收到的请求组包，分为两个类型：
         type == 0 ：正向查询，查询ip为0.0.0.0，返回错误信息
-        type == 1 ：正向查询，合法ip，返回本地数据或远程数据
-        type == 2 ：反向查询，查询ip，返回本地或远程数据
+        type == 1 ：正向查询，合法ip,包括本地和远程
 """
+import dns.resolver
 import struct
-from serve.message import Message
+
 class Response:
     """
     ┏━━━━━━━━━━
@@ -21,54 +21,64 @@ class Response:
     ┃━━━━━━━━━ ┃
     """
     #TO DO
-    def __init__(self, rtype, request, hostRecord):
+    def __init__(self, rtype, request, hostRecord, remoteAddr):
         self.host = hostRecord
         self.rtype = rtype
         self.questions = []
         self.answers = []
         self.authorities = []
         self.additionals = []
+        self.remoteAdrr = remoteAddr
+        # 正向查询，为0.0.0.0
         if rtype == 0:
             _id = request.header.ID
             _flags = 32773
             self.header = Header(_id, _flags, 0, 0, 0, 0)
-            for i in request.header.QDCOUNT:
-                self.questions.append(Question(request.questions[i].QNAME, request.questions[i].CLASS, request.questions[i].QTYPE))
-        elif rtype == 1:
-            _id = request.header.ID
-            _flags = 32768
-            self.header = Header(_id, _flags, request.header.QDCOUNT, request.header.QDCOUNT, 0, 0)
-            for i in request.header.QDCOUNT:
-                self.questions.append(Question(request.questions[i].QNAME, request.questions[i].CLASS, request.questions[i].QTYPE))
-                _ip = self._get_ip(request.questions[i])
-                self.answers.append(Resource(49164, 1, 1, 86400, 4, _ip))
-        #TODO ; 反向查询
+            for i in range(request.header.QDCOUNT):
+                self.questions.append(Question(request.questions[i].QNAME, request.questions[i].QCLASS, request.questions[i].QTYPE))
+        #正向查询
         else:
             _id = request.header.ID
-            _flags = 32773
-            self.header = Header(_id, _flags, 0, 0, 0, 0)
-            for i in request.header.QDCOUNT:
+            _flags = 33152
+            self.header = Header(_id, _flags, request.header.QDCOUNT, request.header.QDCOUNT, 0, 0)
+            for i in range(request.header.QDCOUNT):
                 self.questions.append(
-                    Question(request.questions[i].QNAME, request.questions[i].CLASS, request.questions[i].QTYPE))
-
-    #TODO:  远程请求ip信息
+                    Question(request.questions[i].QNAME, request.questions[i].QCLASS, request.questions[i].QTYPE))
+                _ip = self._get_ip(request.questions[i])
+                if _ip is not None:
+                    self.answers.append(Resource(request.questions[i].QNAME, 1, 1, 86400, 4, _ip))
+                    hostRecord.update({request.questions[i].webname: _ip})
+                else:
+                    self.answers.append(Resource(request.questions[i].QNAME, 1, 1, 86400, 4, '0.0.0.0'))
+    # 查询ip
     def _get_ip(self, question):
-        _ip = ''
         requestDomain = question.webname
+        # 本地存在
         if requestDomain in self.host:
             _ip = self.host[requestDomain]
+        # 本地不存在
         else:
-            _ip = '0.0.0.0'
+            remoteList = [self.remoteAdrr]
+            my_resolver = dns.resolver.Resolver()
+            my_resolver.nameservers = remoteList
+            try:
+                res = my_resolver.query(requestDomain, 'A')
+                _ip =  str(res[0])
+            except Exception:
+                _ip =  None
         return _ip
+    # 序列化输出
     def get_response(self):
         res = self.header.get_header()
+        #非法请求，只有头部
         if self.rtype == 0:
             return res
         else:
             for i in range(self.header.QDCOUNT):
                 res += self.questions[i].get_question()
-        for i in range(self.header.ANCOUNT):
-            res += self.answers[i].get_resource()
+        if self.answers is not None:
+            for i in range(len(self.answers)):
+                res += self.answers[i].get_resource()
 
         return res
 
@@ -123,8 +133,8 @@ class Question:
     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     """
     def __init__(self, _name, _type, _class):
-        self.QTYPE =_type
-        self.QCLASS = _class
+        self.QTYPE = struct.pack('>H',_type)
+        self.QCLASS = struct.pack('>H',_class)
         self.QNAME = _name
 
     def get_question(self):
@@ -154,19 +164,21 @@ class Resource:
      /                                              /
     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     """
-    def __init__(self, rname, rtype, rclass,rttl, rdlength, rdata ):
+    def __init__(self, rname, rtype, rclass, rttl, rdlength, rdata):
         self.NAME = rname
-        self.TYPE = rtype
-        self.CLASS = rclass
-        self.TTL = rttl
-        self.RDLENGTH = rdlength
+        self.TYPE = struct.pack('>H',rtype)
+        self.CLASS = struct.pack('>H',rclass)
+        self.TTL = struct.pack('>L',rttl)
+        self.RDLENGTH = struct.pack('>H',rdlength)
         self.RDATA = rdata
 
     def get_resource(self):
-        res = struct.pack('>HHHLH',self.NAME, self.TYPE, self.CLASS, self.TTL, self.RDLENGTH)
+        res = self.NAME + self.TYPE + self.CLASS + self.TTL + self.RDLENGTH
         ip = self.RDATA.split('.')
         res += struct.pack('BBBB', int(ip[0]), int(ip[1]), int(ip[2]), int(ip[3]))
         return res
+    def get_ip(self):
+        return self.RDATA
 
 
 

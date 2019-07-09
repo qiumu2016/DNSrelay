@@ -8,7 +8,7 @@ class DNS_handler(socketserver.BaseRequestHandler):
         data, sock = self.request
         DNSrequest = Message(data)
         #一条正向查询请求
-        if DNSrequest.header.QR == 0 and DNSrequest.header.Opcode == 0:
+        if DNSrequest.header.QR == 0 and DNSrequest.header.Opcode == 0 and DNSrequest.questions[0].QTYPE == 1:
             #处理questions
             #检查请求的域名合法性
             Rtype = self._chech_request(DNSrequest, DNSServer.hosts)
